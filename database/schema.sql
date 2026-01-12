@@ -256,32 +256,23 @@ GROUP BY a.id, a.name, a.type, a.currency, a.initial_balance, a.household_id;
 
 -- View: Allocation status (calculated)
 CREATE OR REPLACE VIEW allocation_status AS
-SELECT 
+SELECT
     al.id as allocation_id,
-    al.name,
-    al.planned_amount,
-    al.planned_currency,
-    al.period_type,
-    al.period_start_date,
-    al.period_end_date,
-    COALESCE(SUM(ABS(tl.base_currency_amount)), 0) as actual_spent,
-    al.planned_amount - COALESCE(SUM(ABS(tl.base_currency_amount)), 0) as remaining,
-    CASE 
-        WHEN COALESCE(SUM(ABS(tl.base_currency_amount)), 0) = 0 THEN 'unused'
-        WHEN COALESCE(SUM(ABS(tl.base_currency_amount)), 0) = al.planned_amount THEN 'matched'
-        WHEN COALESCE(SUM(ABS(tl.base_currency_amount)), 0) < al.planned_amount THEN 'underused'
-        ELSE 'overused'
+    c.name as category_name,
+    al.month,
+    al.allocated_amount,
+    al.available_amount,
+    al.spent_amount,
+    al.available_amount - al.spent_amount as balance,
+    CASE
+        WHEN al.spent_amount = 0 THEN 'unused'
+        WHEN al.spent_amount >= al.available_amount THEN 'overspent'
+        WHEN al.spent_amount >= al.allocated_amount THEN 'over_budget'
+        ELSE 'on_track'
     END as status,
     al.household_id
 FROM allocations al
-LEFT JOIN transaction_line_allocations tla ON al.id = tla.allocation_id
-LEFT JOIN transaction_lines tl ON tla.transaction_line_id = tl.id
-LEFT JOIN transactions t ON tl.transaction_id = t.id
-WHERE al.is_active = TRUE 
-  AND (t.is_deleted = FALSE OR t.is_deleted IS NULL)
-  AND (tl.direction = 'expense' OR tl.direction IS NULL)
-GROUP BY al.id, al.name, al.planned_amount, al.planned_currency, 
-         al.period_type, al.period_start_date, al.period_end_date, al.household_id;
+JOIN categories c ON al.category_id = c.id;
 
 -- View: Budget status (calculated)
 CREATE OR REPLACE VIEW budget_status AS
