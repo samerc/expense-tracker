@@ -59,6 +59,7 @@ coverage/
 # Database
 *.sql.backup
 *.dump
+database/seeds/
 
 # PM2
 .pm2/
