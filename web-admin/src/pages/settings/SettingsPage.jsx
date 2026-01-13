@@ -8,6 +8,7 @@ import { userAPI, householdAPI } from '../../services/api';
 import UserProfileSection from '../../components/settings/UserProfileSection';
 import PreferencesSection from '../../components/settings/PreferencesSection';
 import HouseholdSection from '../../components/settings/HouseholdSection';
+import PasswordChangeSection from '../../components/settings/PasswordChangeSection';
 
 /**
  * SettingsPage Component
@@ -117,6 +118,9 @@ export default function SettingsPage() {
             user={profileData || user}
             onUpdateProfile={handleUpdateProfile}
           />
+
+          {/* Password Change Section */}
+          <PasswordChangeSection />
 
           {/* Household Section */}
           <HouseholdSection household={householdData} />
