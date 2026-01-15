@@ -338,15 +338,16 @@ async function createHousehold(req, res) {
 async function updateHousehold(req, res) {
   try {
     const { householdId } = req.params;
-    const { name, baseCurrency } = req.body;
+    const { name, baseCurrency, planId } = req.body;
 
     const result = await db.query(
       `UPDATE households
        SET name = COALESCE($1, name),
-           base_currency = COALESCE($2, base_currency)
-       WHERE id = $3
+           base_currency = COALESCE($2, base_currency),
+           plan_id = COALESCE($3, plan_id)
+       WHERE id = $4
        RETURNING *`,
-      [name, baseCurrency, householdId]
+      [name, baseCurrency, planId || null, householdId]
     );
 
     if (result.rows.length === 0) {
