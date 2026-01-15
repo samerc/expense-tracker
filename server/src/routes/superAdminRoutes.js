@@ -19,6 +19,7 @@ router.put('/households/:householdId/status', superAdminController.toggleHouseho
 router.post('/users', superAdminController.createUser);
 router.put('/users/:userId', superAdminController.updateUser);
 router.delete('/users/:userId', superAdminController.deleteUser);
+router.post('/users/:userId/reset-password', superAdminController.resetUserPassword);
 
 // Plans management
 router.get('/plans', superAdminController.getAllPlans);

@@ -494,6 +494,46 @@ async function deleteUser(req, res) {
   }
 }
 
+// Reset user password
+async function resetUserPassword(req, res) {
+  try {
+    const { userId } = req.params;
+
+    // Generate random password (12 chars, alphanumeric + special)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+    let newPassword = '';
+    for (let i = 0; i < 12; i++) {
+      newPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    // Hash the password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update user
+    const result = await db.query(
+      `UPDATE users
+       SET password_hash = $1
+       WHERE id = $2
+       RETURNING id, email, name`,
+      [passwordHash, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Return the new password (display to admin since email not working)
+    res.json({
+      message: 'Password reset successfully',
+      user: result.rows[0],
+      newPassword: newPassword,
+    });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+}
+
 module.exports = {
   getAllHouseholds,
   getHouseholdDetails,
@@ -506,5 +546,6 @@ module.exports = {
   updatePlan,
   createUser,
   updateUser,
-  deleteUser
+  deleteUser,
+  resetUserPassword
 };

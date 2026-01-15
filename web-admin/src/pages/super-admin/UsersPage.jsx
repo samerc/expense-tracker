@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users as UsersIcon, Search, Building2, Shield, Mail, Calendar, Activity, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Users as UsersIcon, Search, Building2, Shield, Mail, Calendar, Activity, Plus, MoreVertical, Pencil, Trash2, Key, Copy, Check } from 'lucide-react';
 import { superAdminAPI } from '../../services/api';
 import { useToast, ConfirmationModal } from '../../components/common';
 import UserModal from '../../components/super-admin/UserModal';
@@ -24,6 +24,9 @@ export default function UsersPage() {
   const [menuOpen, setMenuOpen] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [resetPasswordResult, setResetPasswordResult] = useState(null);
+  const [copiedPassword, setCopiedPassword] = useState(false);
 
   /**
    * Fetch all households (to get users)
@@ -119,6 +122,21 @@ export default function UsersPage() {
     },
   });
 
+  /**
+   * Reset password mutation
+   */
+  const resetPasswordMutation = useMutation({
+    mutationFn: (userId) => superAdminAPI.resetUserPassword(userId),
+    onSuccess: (response) => {
+      setResetPasswordResult(response.data);
+      setResetPasswordModalOpen(true);
+      setCopiedPassword(false);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to reset password');
+    },
+  });
+
   const handleCreateUser = () => {
     setEditingUser(null);
     setIsUserModalOpen(true);
@@ -134,6 +152,19 @@ export default function UsersPage() {
     setUserToDelete(user);
     setDeleteConfirmOpen(true);
     setMenuOpen(null);
+  };
+
+  const handleResetPassword = (user) => {
+    resetPasswordMutation.mutate(user.id);
+    setMenuOpen(null);
+  };
+
+  const copyPassword = () => {
+    if (resetPasswordResult?.newPassword) {
+      navigator.clipboard.writeText(resetPasswordResult.newPassword);
+      setCopiedPassword(true);
+      setTimeout(() => setCopiedPassword(false), 2000);
+    }
   };
 
   const confirmDeleteUser = async () => {
@@ -404,6 +435,13 @@ export default function UsersPage() {
                               <span>Edit User</span>
                             </button>
                             <button
+                              onClick={() => handleResetPassword(user)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            >
+                              <Key className="w-4 h-4" />
+                              <span>Reset Password</span>
+                            </button>
+                            <button
                               onClick={() => handleDeleteUser(user)}
                               className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2"
                             >
@@ -455,6 +493,57 @@ export default function UsersPage() {
         confirmVariant="danger"
         isLoading={deleteUserMutation.isPending}
       />
+
+      {/* Reset Password Result Modal */}
+      {resetPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setResetPasswordModalOpen(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md mx-4 z-10">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <Key className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Password Reset</h3>
+                  <p className="text-sm text-gray-500">for {resetPasswordResult?.user?.email}</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">New Password:</p>
+                <div className="flex items-center space-x-2">
+                  <code className="flex-1 text-lg font-mono bg-white dark:bg-gray-800 px-3 py-2 rounded border border-gray-200 dark:border-gray-700">
+                    {resetPasswordResult?.newPassword}
+                  </code>
+                  <button
+                    onClick={copyPassword}
+                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Copy to clipboard"
+                  >
+                    {copiedPassword ? (
+                      <Check className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <Copy className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
+                Make sure to share this password securely with the user. They should change it after logging in.
+              </p>
+
+              <button
+                onClick={() => setResetPasswordModalOpen(false)}
+                className="w-full btn btn-primary"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

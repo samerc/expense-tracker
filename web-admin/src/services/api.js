@@ -260,6 +260,7 @@ export const superAdminAPI = {
   createUser: (data) => api.post('/super-admin/users', data),
   updateUser: (userId, data) => api.put(`/super-admin/users/${userId}`, data),
   deleteUser: (userId) => api.delete(`/super-admin/users/${userId}`),
+  resetUserPassword: (userId) => api.post(`/super-admin/users/${userId}/reset-password`),
 
   // Plans
   getAllPlans: () => api.get('/super-admin/plans'),
