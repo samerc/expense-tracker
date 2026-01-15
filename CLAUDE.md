@@ -192,13 +192,17 @@ VALUES (
 - Added super admin CRUD for households and users
 - Fixed various deployment issues (bcrypt, Express 5, database schema)
 
+### Completed Features
+- **Multi-line transactions** - Fully implemented in web app
+  - TransactionModal supports multiple line items
+  - Exchange rate API integration (Frankfurter)
+  - Multi-currency support per line
+  - See: `web-admin/src/components/transactions/TransactionModal.jsx`
+
 ### Pending Features
-1. **Multi-line transactions** - Plan exists in `.claude/plans/refactored-scribbling-anchor.md`
-   - TransactionModal refactor for split transactions
-   - Exchange rate API integration (Frankfurter)
-   - Multi-currency support per line
-2. **Mobile offline sync** - WatermelonDB setup pending
-3. **Email invitations** - Backend exists, email sending not implemented
+1. **Mobile offline sync** - WatermelonDB setup pending
+2. **Email invitations** - Backend exists, email sending not implemented
+3. **Mobile transaction features** - Edit/delete, budget funding from mobile
 
 ### Known Production Issues
 - Allocations API returns 500 if user has no allocations set up for the month
