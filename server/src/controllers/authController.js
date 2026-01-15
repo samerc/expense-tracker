@@ -269,12 +269,7 @@ async function forgotPassword(req, res) {
     const passwordHash = await hashPassword(tempPassword);
 
     await db.query(
-      `UPDATE users
-       SET password_hash = $1,
-           password_reset_token = NULL,
-           password_reset_expires_at = NULL,
-           modified_at = NOW()
-       WHERE id = $2`,
+      `UPDATE users SET password_hash = $1 WHERE id = $2`,
       [passwordHash, user.id]
     );
 
