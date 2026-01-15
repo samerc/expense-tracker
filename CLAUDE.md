@@ -107,3 +107,99 @@ Super admin pages are in `web-admin/src/pages/super-admin/`.
 - Modal pattern: isOpen → useEffect → validate → submit
 - API calls wrapped in React Query hooks
 - All routes protected by `authenticateToken` middleware
+
+---
+
+## Mobile App (mobile/)
+
+React Native app built with Expo SDK 54 for iOS/Android.
+
+### Running the Mobile App
+```bash
+cd mobile
+npm install
+npx expo start --tunnel    # Use tunnel for testing on physical device
+```
+Scan QR code with Expo Go app on your phone.
+
+### Mobile Structure
+- `app/` - Expo Router file-based navigation
+  - `_layout.tsx` - Root layout with AuthProvider
+  - `login.tsx` - Login screen
+  - `(tabs)/` - Tab navigator (authenticated screens)
+    - `index.tsx` - Home/Dashboard
+    - `transactions.tsx` - Transaction list
+    - `add.tsx` - Add transaction form
+    - `budgets.tsx` - Budget/Allocations view
+    - `settings.tsx` - User settings & logout
+- `src/context/AuthContext.tsx` - Auth state with expo-secure-store
+- `src/services/api.ts` - Axios client pointing to production API
+
+### Mobile Current State (Jan 2026)
+- ✅ Basic screens created and functional
+- ✅ Login flow works with SecureStore token persistence
+- ✅ Connects to production API (https://expense.fancyshark.com/api)
+- ⏳ WatermelonDB offline storage not yet implemented
+- ⏳ Multi-device sync not yet implemented
+- ⏳ Touch-optimized category selection (drag) not yet implemented
+
+### Mobile Next Steps
+1. Set up WatermelonDB for offline-first storage
+2. Build sync mechanism between local DB and server
+3. Implement touch-friendly category picker (drag to select)
+4. Add transaction edit/delete functionality
+5. Implement budget funding from mobile
+6. App store preparation (icons, splash, builds)
+
+---
+
+## Deployment
+
+### Production Server
+- **URL:** https://expense.fancyshark.com
+- **Server:** Windows Server 2025 with IIS reverse proxy
+- **Database:** PostgreSQL on same server
+
+### Server Setup Notes
+- IIS reverse proxies to Node.js on port 3000
+- SSL handled at IIS level (no HTTPS redirect in app)
+- Database user: `expense_tracker_user`
+- Run `database/seeds/production_seed.sql` for initial data
+
+### Creating Users via SQL
+```sql
+-- Password: password123 (bcrypt hash)
+INSERT INTO users (id, household_id, email, password_hash, name, role, is_active)
+VALUES (
+  gen_random_uuid(),
+  'HOUSEHOLD_UUID_HERE',
+  'user@example.com',
+  '$2a$10$N9qo8uLOickgx2ZMRZoMye.IjEfV0YELR4GJQxqChBE.jmJOCTG4y',
+  'User Name',
+  'regular',
+  TRUE
+);
+```
+
+---
+
+## Session Notes (Last Updated: Jan 2026)
+
+### Recently Completed
+- Deployed web app to Windows Server 2025 with IIS
+- Connected project to GitHub (github.com/samerc/expense-tracker)
+- Created mobile app with Expo SDK 54
+- Added super admin CRUD for households and users
+- Fixed various deployment issues (bcrypt, Express 5, database schema)
+
+### Pending Features
+1. **Multi-line transactions** - Plan exists in `.claude/plans/refactored-scribbling-anchor.md`
+   - TransactionModal refactor for split transactions
+   - Exchange rate API integration (Frankfurter)
+   - Multi-currency support per line
+2. **Mobile offline sync** - WatermelonDB setup pending
+3. **Email invitations** - Backend exists, email sending not implemented
+
+### Known Production Issues
+- Allocations API returns 500 if user has no allocations set up for the month
+- Super admin needs to create household + user before someone can log in
