@@ -250,10 +250,17 @@ export const adminAPI = {
 export const superAdminAPI = {
   // Households
   getAllHouseholds: () => api.get('/super-admin/households'),
+  createHousehold: (data) => api.post('/super-admin/households', data),
   getHouseholdDetails: (householdId) => api.get(`/super-admin/households/${householdId}`),
+  updateHousehold: (householdId, data) => api.put(`/super-admin/households/${householdId}`, data),
   updateHouseholdPlan: (householdId, data) => api.put(`/super-admin/households/${householdId}/plan`, data),
   toggleHouseholdStatus: (householdId, status) => api.put(`/super-admin/households/${householdId}/status`, { status }),
-  
+
+  // Users
+  createUser: (data) => api.post('/super-admin/users', data),
+  updateUser: (userId, data) => api.put(`/super-admin/users/${userId}`, data),
+  deleteUser: (userId) => api.delete(`/super-admin/users/${userId}`),
+
   // Plans
   getAllPlans: () => api.get('/super-admin/plans'),
   createPlan: (data) => api.post('/super-admin/plans', data),

@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const bcrypt = require('bcrypt');
 
 // Get all households with stats
 async function getAllHouseholds(req, res) {
@@ -310,12 +311,200 @@ async function updatePlan(req, res) {
   }
 }
 
+// Create household
+async function createHousehold(req, res) {
+  try {
+    const { name, baseCurrency, planId } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Household name is required' });
+    }
+
+    const result = await db.query(
+      `INSERT INTO households (name, base_currency, plan_id, plan_status)
+       VALUES ($1, $2, $3, 'active')
+       RETURNING *`,
+      [name, baseCurrency || 'USD', planId || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Create household error:', err);
+    res.status(500).json({ error: 'Failed to create household' });
+  }
+}
+
+// Update household
+async function updateHousehold(req, res) {
+  try {
+    const { householdId } = req.params;
+    const { name, baseCurrency } = req.body;
+
+    const result = await db.query(
+      `UPDATE households
+       SET name = COALESCE($1, name),
+           base_currency = COALESCE($2, base_currency)
+       WHERE id = $3
+       RETURNING *`,
+      [name, baseCurrency, householdId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Household not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Update household error:', err);
+    res.status(500).json({ error: 'Failed to update household' });
+  }
+}
+
+// Create user
+async function createUser(req, res) {
+  try {
+    const { email, password, name, role, householdId, isActive } = req.body;
+
+    if (!email || !password || !name || !householdId) {
+      return res.status(400).json({
+        error: 'Email, password, name, and household ID are required'
+      });
+    }
+
+    // Verify household exists
+    const householdCheck = await db.query(
+      'SELECT id FROM households WHERE id = $1',
+      [householdId]
+    );
+
+    if (householdCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Household not found' });
+    }
+
+    // Check if email already exists
+    const emailCheck = await db.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+
+    if (emailCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const result = await db.query(
+      `INSERT INTO users (email, password_hash, name, role, household_id, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, email, name, role, household_id, is_active, created_at`,
+      [email.toLowerCase(), passwordHash, name, role || 'regular', householdId, isActive !== false]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Create user error:', err);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+}
+
+// Update user
+async function updateUser(req, res) {
+  try {
+    const { userId } = req.params;
+    const { name, email, role, isActive, password, householdId } = req.body;
+
+    // Build dynamic update
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (email !== undefined) {
+      updates.push(`email = $${paramIndex++}`);
+      values.push(email.toLowerCase());
+    }
+    if (role !== undefined) {
+      updates.push(`role = $${paramIndex++}`);
+      values.push(role);
+    }
+    if (isActive !== undefined) {
+      updates.push(`is_active = $${paramIndex++}`);
+      values.push(isActive);
+    }
+    if (householdId !== undefined) {
+      updates.push(`household_id = $${paramIndex++}`);
+      values.push(householdId);
+    }
+    if (password) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      updates.push(`password_hash = $${paramIndex++}`);
+      values.push(passwordHash);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(userId);
+
+    const result = await db.query(
+      `UPDATE users
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex}
+       RETURNING id, email, name, role, household_id, is_active, created_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Update user error:', err);
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+}
+
+// Delete user
+async function deleteUser(req, res) {
+  try {
+    const { userId } = req.params;
+
+    const result = await db.query(
+      `DELETE FROM users WHERE id = $1 RETURNING id, email, name`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted', user: result.rows[0] });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+}
+
 module.exports = {
   getAllHouseholds,
   getHouseholdDetails,
+  createHousehold,
+  updateHousehold,
   updateHouseholdPlan,
   toggleHouseholdStatus,
   getAllPlans,
   createPlan,
-  updatePlan
+  updatePlan,
+  createUser,
+  updateUser,
+  deleteUser
 };

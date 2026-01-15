@@ -1,73 +1,60 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
 import { useState } from 'react';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
+import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [biometrics, setBiometrics] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)/login');
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: logout },
+      ]
+    );
   };
 
-  const SettingsItem = ({
+  const SettingItem = ({
     icon,
-    label,
-    value,
+    title,
+    subtitle,
     onPress,
-    showArrow = true,
-    danger = false,
+    rightElement,
+    danger,
   }: {
     icon: string;
-    label: string;
-    value?: string;
+    title: string;
+    subtitle?: string;
     onPress?: () => void;
-    showArrow?: boolean;
+    rightElement?: React.ReactNode;
     danger?: boolean;
   }) => (
-    <TouchableOpacity style={styles.settingsItem} onPress={onPress} disabled={!onPress}>
-      <View style={[styles.settingsIcon, danger && styles.dangerIcon]}>
+    <TouchableOpacity
+      style={styles.settingItem}
+      onPress={onPress}
+      disabled={!onPress && !rightElement}
+    >
+      <View style={[styles.settingIcon, danger && styles.settingIconDanger]}>
         <Ionicons name={icon as any} size={20} color={danger ? '#EF4444' : '#6B7280'} />
       </View>
-      <Text style={[styles.settingsLabel, danger && styles.dangerText]}>{label}</Text>
-      {value && <Text style={styles.settingsValue}>{value}</Text>}
-      {showArrow && onPress && <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />}
-    </TouchableOpacity>
-  );
-
-  const SettingsToggle = ({
-    icon,
-    label,
-    value,
-    onValueChange,
-  }: {
-    icon: string;
-    label: string;
-    value: boolean;
-    onValueChange: (value: boolean) => void;
-  }) => (
-    <View style={styles.settingsItem}>
-      <View style={styles.settingsIcon}>
-        <Ionicons name={icon as any} size={20} color="#6B7280" />
+      <View style={styles.settingContent}>
+        <Text style={[styles.settingTitle, danger && styles.settingTitleDanger]}>{title}</Text>
+        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
       </View>
-      <Text style={styles.settingsLabel}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
-        thumbColor="#fff"
-      />
-    </View>
+      {rightElement || (
+        <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
+      )}
+    </TouchableOpacity>
   );
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
@@ -81,34 +68,30 @@ export default function SettingsScreen() {
         </View>
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{user?.name || 'User'}</Text>
-          <Text style={styles.profileEmail}>{user?.email || 'user@example.com'}</Text>
+          <Text style={styles.profileEmail}>{user?.email || ''}</Text>
         </View>
-        <TouchableOpacity>
-          <Ionicons name="create-outline" size={20} color="#3B82F6" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Sync Status */}
-      <View style={styles.syncCard}>
-        <View style={styles.syncStatus}>
-          <Ionicons name="cloud-done" size={24} color="#10B981" />
-          <View style={styles.syncInfo}>
-            <Text style={styles.syncTitle}>All synced</Text>
-            <Text style={styles.syncSubtitle}>Last sync: Just now</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.syncButton}>
-          <Text style={styles.syncButtonText}>Sync Now</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Account Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.sectionContent}>
-          <SettingsItem icon="person-outline" label="Profile" onPress={() => {}} />
-          <SettingsItem icon="home-outline" label="Household" value="Cheaib Family" onPress={() => {}} />
-          <SettingsItem icon="card-outline" label="Subscription" value="Pro" onPress={() => {}} />
+          <SettingItem
+            icon="person-outline"
+            title="Edit Profile"
+            subtitle="Name, email"
+            onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available in a future update.')}
+          />
+          <SettingItem
+            icon="lock-closed-outline"
+            title="Change Password"
+            onPress={() => Alert.alert('Coming Soon', 'Password change will be available in a future update.')}
+          />
+          <SettingItem
+            icon="home-outline"
+            title="Household"
+            subtitle={user?.householdName || 'Your household'}
+          />
         </View>
       </View>
 
@@ -116,24 +99,39 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.sectionContent}>
-          <SettingsItem icon="cash-outline" label="Currency" value="USD" onPress={() => {}} />
-          <SettingsToggle
-            icon="moon-outline"
-            label="Dark Mode"
-            value={darkMode}
-            onValueChange={setDarkMode}
-          />
-          <SettingsToggle
+          <SettingItem
             icon="notifications-outline"
-            label="Notifications"
-            value={notifications}
-            onValueChange={setNotifications}
+            title="Notifications"
+            rightElement={
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={setNotificationsEnabled}
+                trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
+                thumbColor={notificationsEnabled ? '#3B82F6' : '#F3F4F6'}
+              />
+            }
           />
-          <SettingsToggle
-            icon="finger-print-outline"
-            label="Biometric Login"
-            value={biometrics}
-            onValueChange={setBiometrics}
+          <SettingItem
+            icon="finger-print"
+            title="Biometric Login"
+            rightElement={
+              <Switch
+                value={biometricEnabled}
+                onValueChange={setBiometricEnabled}
+                trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
+                thumbColor={biometricEnabled ? '#3B82F6' : '#F3F4F6'}
+              />
+            }
+          />
+          <SettingItem
+            icon="moon-outline"
+            title="Dark Mode"
+            subtitle="Coming soon"
+          />
+          <SettingItem
+            icon="globe-outline"
+            title="Currency"
+            subtitle="USD"
           />
         </View>
       </View>
@@ -142,36 +140,61 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data</Text>
         <View style={styles.sectionContent}>
-          <SettingsItem icon="download-outline" label="Export Data" onPress={() => {}} />
-          <SettingsItem icon="cloud-upload-outline" label="Backup Settings" onPress={() => {}} />
-          <SettingsItem icon="trash-outline" label="Clear Local Data" onPress={() => {}} danger />
+          <SettingItem
+            icon="sync-outline"
+            title="Sync Status"
+            subtitle="All data synced"
+            rightElement={
+              <View style={styles.syncBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              </View>
+            }
+          />
+          <SettingItem
+            icon="cloud-download-outline"
+            title="Export Data"
+            onPress={() => Alert.alert('Coming Soon', 'Data export will be available in a future update.')}
+          />
         </View>
       </View>
 
-      {/* About Section */}
+      {/* Support Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
+        <Text style={styles.sectionTitle}>Support</Text>
         <View style={styles.sectionContent}>
-          <SettingsItem icon="information-circle-outline" label="Version" value="1.0.0" showArrow={false} />
-          <SettingsItem icon="document-text-outline" label="Terms of Service" onPress={() => {}} />
-          <SettingsItem icon="shield-outline" label="Privacy Policy" onPress={() => {}} />
+          <SettingItem
+            icon="help-circle-outline"
+            title="Help & FAQ"
+            onPress={() => Alert.alert('Coming Soon', 'Help documentation will be available soon.')}
+          />
+          <SettingItem
+            icon="chatbubble-outline"
+            title="Contact Support"
+            onPress={() => Alert.alert('Contact Support', 'Email us at support@fancyshark.com')}
+          />
+          <SettingItem
+            icon="information-circle-outline"
+            title="About"
+            subtitle={`Version ${Constants.expoConfig?.version || '1.0.0'}`}
+          />
         </View>
       </View>
 
-      {/* Logout */}
+      {/* Logout Section */}
       <View style={styles.section}>
         <View style={styles.sectionContent}>
-          <SettingsItem
+          <SettingItem
             icon="log-out-outline"
-            label="Log Out"
+            title="Sign Out"
             onPress={handleLogout}
-            showArrow={false}
             danger
           />
         </View>
       </View>
 
-      <View style={{ height: 40 }} />
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Expense Tracker by FancyShark</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -186,6 +209,8 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 16,
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 24,
@@ -195,29 +220,28 @@ const styles = StyleSheet.create({
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     padding: 20,
-    marginBottom: 16,
+    backgroundColor: '#fff',
+    marginBottom: 24,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#fff',
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    color: '#fff',
   },
   profileInfo: {
-    flex: 1,
     marginLeft: 16,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#111827',
   },
@@ -225,42 +249,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginTop: 2,
-  },
-  syncCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  syncStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  syncInfo: {
-    marginLeft: 12,
-  },
-  syncTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  syncSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  syncButton: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  syncButtonText: {
-    color: '#3B82F6',
-    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
@@ -270,46 +258,60 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginLeft: 20,
     marginBottom: 8,
   },
   sectionContent: {
     backgroundColor: '#fff',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  settingsItem: {
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  settingsIcon: {
+  settingIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  dangerIcon: {
+  settingIconDanger: {
     backgroundColor: '#FEE2E2',
   },
-  settingsLabel: {
+  settingContent: {
     flex: 1,
+    marginLeft: 12,
+  },
+  settingTitle: {
     fontSize: 16,
     color: '#111827',
   },
-  dangerText: {
+  settingTitleDanger: {
     color: '#EF4444',
   },
-  settingsValue: {
-    fontSize: 15,
-    color: '#6B7280',
-    marginRight: 8,
+  settingSubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  syncBadge: {
+    padding: 4,
+  },
+  footer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  footerText: {
+    fontSize: 13,
+    color: '#9CA3AF',
   },
 });

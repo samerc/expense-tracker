@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, Search, MoreVertical, Edit2, Trash2, Users, Activity, CreditCard } from 'lucide-react';
+import { Building2, Plus, Search, MoreVertical, Edit2, Trash2, Users, Activity, CreditCard, Pencil } from 'lucide-react';
 import { LoadingSpinner, useToast, ConfirmationModal } from '../../components/common';
 import { superAdminAPI } from '../../services/api';
 import HouseholdDetailsModal from '../../components/super-admin/HouseholdDetailsModal';
+import HouseholdModal from '../../components/super-admin/HouseholdModal';
 
 /**
  * HouseholdsPage Component
@@ -25,6 +26,8 @@ export default function HouseholdsPage() {
   const [menuPosition, setMenuPosition] = useState('down');
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [householdToToggle, setHouseholdToToggle] = useState(null);
+  const [isHouseholdModalOpen, setIsHouseholdModalOpen] = useState(false);
+  const [editingHousehold, setEditingHousehold] = useState(null);
 
   /**
    * Fetch all households
@@ -54,10 +57,41 @@ export default function HouseholdsPage() {
    * Toggle status mutation
    */
   const toggleStatusMutation = useMutation({
-    mutationFn: ({ householdId, status }) => 
+    mutationFn: ({ householdId, status }) =>
       superAdminAPI.toggleHouseholdStatus(householdId, status),
     onSuccess: () => {
       queryClient.invalidateQueries(['super-admin-households']);
+    },
+  });
+
+  /**
+   * Create household mutation
+   */
+  const createHouseholdMutation = useMutation({
+    mutationFn: (data) => superAdminAPI.createHousehold(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['super-admin-households']);
+      toast.success('Household created successfully');
+      setIsHouseholdModalOpen(false);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to create household');
+    },
+  });
+
+  /**
+   * Update household mutation
+   */
+  const updateHouseholdMutation = useMutation({
+    mutationFn: ({ id, data }) => superAdminAPI.updateHousehold(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['super-admin-households']);
+      toast.success('Household updated successfully');
+      setIsHouseholdModalOpen(false);
+      setEditingHousehold(null);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to update household');
     },
   });
 
@@ -67,6 +101,34 @@ export default function HouseholdsPage() {
   const handleViewDetails = (household) => {
     setSelectedHousehold(household);
     setIsDetailsOpen(true);
+  };
+
+  /**
+   * Handle create household
+   */
+  const handleCreateHousehold = () => {
+    setEditingHousehold(null);
+    setIsHouseholdModalOpen(true);
+  };
+
+  /**
+   * Handle edit household
+   */
+  const handleEditHousehold = (household) => {
+    setEditingHousehold(household);
+    setIsHouseholdModalOpen(true);
+    setMenuOpen(null);
+  };
+
+  /**
+   * Handle household modal submit
+   */
+  const handleHouseholdSubmit = (data) => {
+    if (editingHousehold) {
+      updateHouseholdMutation.mutate({ id: editingHousehold.id, data });
+    } else {
+      createHouseholdMutation.mutate(data);
+    }
   };
 
   /**
@@ -136,6 +198,7 @@ export default function HouseholdsPage() {
         </div>
 
         <button
+          onClick={handleCreateHousehold}
           className="btn btn-primary flex items-center space-x-2"
         >
           <Plus className="w-4 h-4" />
@@ -290,6 +353,13 @@ export default function HouseholdsPage() {
                               <span>View Details</span>
                             </button>
                             <button
+                              onClick={() => handleEditHousehold(household)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            >
+                              <Pencil className="w-4 h-4" />
+                              <span>Edit Household</span>
+                            </button>
+                            <button
                               onClick={() => handleToggleStatus(household)}
                               className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
                             >
@@ -331,6 +401,18 @@ export default function HouseholdsPage() {
         }}
         household={selectedHousehold}
         details={detailsData}
+      />
+
+      {/* Create/Edit Household Modal */}
+      <HouseholdModal
+        isOpen={isHouseholdModalOpen}
+        onClose={() => {
+          setIsHouseholdModalOpen(false);
+          setEditingHousehold(null);
+        }}
+        onSubmit={handleHouseholdSubmit}
+        household={editingHousehold}
+        isLoading={createHouseholdMutation.isPending || updateHouseholdMutation.isPending}
       />
     </div>
   );

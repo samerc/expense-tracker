@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Users as UsersIcon, Search, Building2, Shield, Mail, Calendar, Activity } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Users as UsersIcon, Search, Building2, Shield, Mail, Calendar, Activity, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { superAdminAPI } from '../../services/api';
+import { useToast, ConfirmationModal } from '../../components/common';
+import UserModal from '../../components/super-admin/UserModal';
 
 /**
  * UsersPage Component
@@ -13,8 +15,15 @@ import { superAdminAPI } from '../../services/api';
  * - View user details
  */
 export default function UsersPage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   /**
    * Fetch all households (to get users)
@@ -62,6 +71,86 @@ export default function UsersPage() {
     enabled: !!householdsData?.households?.length,
   });
 
+  /**
+   * Create user mutation
+   */
+  const createUserMutation = useMutation({
+    mutationFn: (data) => superAdminAPI.createUser(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['super-admin-all-users']);
+      queryClient.invalidateQueries(['super-admin-households-users']);
+      toast.success('User created successfully');
+      setIsUserModalOpen(false);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to create user');
+    },
+  });
+
+  /**
+   * Update user mutation
+   */
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, data }) => superAdminAPI.updateUser(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['super-admin-all-users']);
+      queryClient.invalidateQueries(['super-admin-households-users']);
+      toast.success('User updated successfully');
+      setIsUserModalOpen(false);
+      setEditingUser(null);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to update user');
+    },
+  });
+
+  /**
+   * Delete user mutation
+   */
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId) => superAdminAPI.deleteUser(userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['super-admin-all-users']);
+      queryClient.invalidateQueries(['super-admin-households-users']);
+      toast.success('User deleted successfully');
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Failed to delete user');
+    },
+  });
+
+  const handleCreateUser = () => {
+    setEditingUser(null);
+    setIsUserModalOpen(true);
+  };
+
+  const handleEditUser = (user) => {
+    setEditingUser(user);
+    setIsUserModalOpen(true);
+    setMenuOpen(null);
+  };
+
+  const handleDeleteUser = (user) => {
+    setUserToDelete(user);
+    setDeleteConfirmOpen(true);
+    setMenuOpen(null);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (userToDelete) {
+      await deleteUserMutation.mutateAsync(userToDelete.id);
+      setUserToDelete(null);
+    }
+  };
+
+  const handleUserSubmit = (data) => {
+    if (editingUser) {
+      updateUserMutation.mutate({ id: editingUser.id, data });
+    } else {
+      createUserMutation.mutate(data);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -96,14 +185,23 @@ export default function UsersPage() {
     <div className="space-y-6">
 
       {/* Page Header */}
-      <div className="flex items-center space-x-3">
-        <UsersIcon className="w-8 h-8 text-purple-600" />
-        <div>
-          <h1 className="text-3xl font-bold">All Users</h1>
-          <p className="text-gray-600">
-            View and manage users across all households
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <UsersIcon className="w-8 h-8 text-purple-600" />
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">All Users</h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              View and manage users across all households
+            </p>
+          </div>
         </div>
+        <button
+          onClick={handleCreateUser}
+          className="btn btn-primary flex items-center space-x-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create User</span>
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -186,6 +284,9 @@ export default function UsersPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -277,6 +378,43 @@ export default function UsersPage() {
                       )}
                     </div>
                   </td>
+
+                  {/* Actions */}
+                  <td className="px-6 py-4 text-right">
+                    <div className="relative inline-block">
+                      <button
+                        onClick={() => setMenuOpen(menuOpen === user.id ? null : user.id)}
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      >
+                        <MoreVertical className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                      </button>
+
+                      {menuOpen === user.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setMenuOpen(null)}
+                          />
+                          <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                            <button
+                              onClick={() => handleEditUser(user)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            >
+                              <Pencil className="w-4 h-4" />
+                              <span>Edit User</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user)}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Delete User</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -290,6 +428,33 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      {/* Create/Edit User Modal */}
+      <UserModal
+        isOpen={isUserModalOpen}
+        onClose={() => {
+          setIsUserModalOpen(false);
+          setEditingUser(null);
+        }}
+        onSubmit={handleUserSubmit}
+        user={editingUser}
+        isLoading={createUserMutation.isPending || updateUserMutation.isPending}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => {
+          setDeleteConfirmOpen(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={confirmDeleteUser}
+        title="Delete User"
+        message={`Are you sure you want to delete ${userToDelete?.name}? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+        isLoading={deleteUserMutation.isPending}
+      />
     </div>
   );
 }

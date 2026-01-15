@@ -1,33 +1,46 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInRight, Layout } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { transactionsAPI } from '../../src/services/api';
 
 interface Transaction {
   id: string;
   title: string;
-  amount: number;
-  category: string;
-  categoryIcon: string;
-  categoryColor: string;
   date: string;
-  account: string;
+  lines: {
+    id: string;
+    amount: number;
+    direction: string;
+    category?: { name: string; icon: string };
+    account?: { name: string };
+  }[];
 }
 
-// Mock data - will be replaced with WatermelonDB
-const mockTransactions: Transaction[] = [
-  { id: '1', title: 'Grocery Shopping', amount: -125.50, category: 'Groceries', categoryIcon: 'cart', categoryColor: '#10B981', date: '2026-01-13', account: 'Checking' },
-  { id: '2', title: 'Monthly Rent', amount: -1500.00, category: 'Housing', categoryIcon: 'home', categoryColor: '#3B82F6', date: '2026-01-12', account: 'Checking' },
-  { id: '3', title: 'Salary Deposit', amount: 5200.00, category: 'Salary', categoryIcon: 'cash', categoryColor: '#10B981', date: '2026-01-10', account: 'Checking' },
-  { id: '4', title: 'Uber Ride', amount: -28.50, category: 'Transportation', categoryIcon: 'car', categoryColor: '#F59E0B', date: '2026-01-09', account: 'Credit Card' },
-  { id: '5', title: 'Restaurant Dinner', amount: -85.00, category: 'Dining Out', categoryIcon: 'restaurant', categoryColor: '#EF4444', date: '2026-01-09', account: 'Credit Card' },
-  { id: '6', title: 'Electric Bill', amount: -145.00, category: 'Utilities', categoryIcon: 'flash', categoryColor: '#8B5CF6', date: '2026-01-08', account: 'Checking' },
-  { id: '7', title: 'Freelance Payment', amount: 850.00, category: 'Freelance', categoryIcon: 'briefcase', categoryColor: '#10B981', date: '2026-01-07', account: 'Checking' },
-];
-
 export default function TransactionsScreen() {
-  const [transactions] = useState<Transaction[]>(mockTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await transactionsAPI.getAll({ limit: 50 });
+      setTransactions(response.data.transactions || []);
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchTransactions();
+  }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -40,60 +53,84 @@ export default function TransactionsScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const renderTransaction = ({ item, index }: { item: Transaction; index: number }) => (
-    <Animated.View
-      entering={FadeInRight.delay(index * 50)}
-      layout={Layout.springify()}
-    >
-      <TouchableOpacity style={styles.transactionItem} activeOpacity={0.7}>
-        <View style={[styles.categoryIcon, { backgroundColor: item.categoryColor + '20' }]}>
-          <Ionicons name={item.categoryIcon as any} size={20} color={item.categoryColor} />
-        </View>
+  const getTransactionAmount = (transaction: Transaction) => {
+    return transaction.lines.reduce((sum, line) => {
+      return sum + (line.direction === 'expense' ? -Math.abs(line.amount) : Math.abs(line.amount));
+    }, 0);
+  };
 
-        <View style={styles.transactionInfo}>
+  const getIconName = (transaction: Transaction) => {
+    const icon = transaction.lines[0]?.category?.icon;
+    const iconMap: Record<string, string> = {
+      'shopping-cart': 'cart',
+      'home': 'home',
+      'car': 'car',
+      'utensils': 'restaurant',
+      'bolt': 'flash',
+      'gamepad': 'game-controller',
+      'heart': 'heart',
+      'briefcase': 'briefcase',
+      'gift': 'gift',
+      'wallet': 'wallet',
+    };
+    return iconMap[icon || ''] || 'cash';
+  };
+
+  const renderTransaction = ({ item }: { item: Transaction }) => {
+    const amount = getTransactionAmount(item);
+    const isIncome = amount > 0;
+
+    return (
+      <TouchableOpacity style={styles.transactionItem}>
+        <View style={styles.transactionIcon}>
+          <Ionicons name={getIconName(item) as any} size={20} color="#6B7280" />
+        </View>
+        <View style={styles.transactionDetails}>
           <Text style={styles.transactionTitle}>{item.title}</Text>
-          <Text style={styles.transactionMeta}>
-            {item.category} • {item.account}
-          </Text>
-        </View>
-
-        <View style={styles.transactionRight}>
-          <Text style={[
-            styles.transactionAmount,
-            item.amount > 0 ? styles.income : styles.expense
-          ]}>
-            {item.amount > 0 ? '+' : ''}{item.amount.toFixed(2)}
+          <Text style={styles.transactionCategory}>
+            {item.lines[0]?.category?.name || 'Uncategorized'}
           </Text>
           <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
         </View>
+        <Text style={[styles.transactionAmount, isIncome && styles.income]}>
+          {isIncome ? '+' : ''}${Math.abs(amount).toFixed(2)}
+        </Text>
       </TouchableOpacity>
-    </Animated.View>
-  );
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Transactions</Text>
         <TouchableOpacity style={styles.filterButton}>
-          <Ionicons name="filter" size={20} color="#6B7280" />
+          <Ionicons name="filter" size={20} color="#3B82F6" />
         </TouchableOpacity>
       </View>
 
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color="#9CA3AF" />
-        <Text style={styles.searchPlaceholder}>Search transactions...</Text>
-      </View>
-
-      {/* Transactions List */}
       <FlatList
         data={transactions}
-        keyExtractor={(item) => item.id}
         renderItem={renderTransaction}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyText}>No transactions yet</Text>
+            <Text style={styles.emptySubtext}>Add your first transaction to get started</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -104,6 +141,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -112,6 +155,8 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 16,
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
     fontSize: 24,
@@ -121,31 +166,13 @@ const styles = StyleSheet.create({
   filterButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginVertical: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  searchPlaceholder: {
-    marginLeft: 8,
-    color: '#9CA3AF',
-    fontSize: 15,
-  },
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+    padding: 20,
   },
   transactionItem: {
     flexDirection: 'row',
@@ -153,15 +180,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  categoryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  transactionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  transactionInfo: {
+  transactionDetails: {
     flex: 1,
     marginLeft: 12,
   },
@@ -170,30 +204,38 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#111827',
   },
-  transactionMeta: {
+  transactionCategory: {
     fontSize: 13,
     color: '#6B7280',
     marginTop: 2,
-  },
-  transactionRight: {
-    alignItems: 'flex-end',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  income: {
-    color: '#10B981',
-  },
-  expense: {
-    color: '#111827',
   },
   transactionDate: {
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 2,
   },
-  separator: {
-    height: 8,
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  income: {
+    color: '#10B981',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
   },
 });

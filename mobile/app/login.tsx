@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useAuth } from '../../src/context/AuthContext';
+import { useAuth } from '../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
@@ -34,7 +34,7 @@ export default function LoginScreen() {
       await login(email, password);
       router.replace('/(tabs)');
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.response?.data?.error || 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -46,14 +46,12 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <View style={styles.content}>
-        {/* Logo/Header */}
         <View style={styles.header}>
           <Ionicons name="wallet" size={64} color="#3B82F6" />
           <Text style={styles.title}>Expense Tracker</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
           {error ? (
             <View style={styles.errorContainer}>
@@ -71,7 +69,6 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              autoComplete="email"
             />
           </View>
 
@@ -84,7 +81,6 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
-              autoComplete="password"
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
               <Ionicons

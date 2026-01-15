@@ -25,7 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load stored auth on app start
   useEffect(() => {
     loadStoredAuth();
   }, []);
@@ -41,41 +40,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       }
     } catch (error) {
-      console.error('Error loading auth:', error);
-    } finally {
-      setIsLoading(false);
+      console.log('Error loading auth:', error);
     }
+    setIsLoading(false);
   };
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token: newToken, user: userData } = response.data;
+    const response = await api.post('/auth/login', { email, password });
+    const { token: newToken, user: userData } = response.data;
 
-      // Store securely
-      await SecureStore.setItemAsync('token', newToken);
-      await SecureStore.setItemAsync('user', JSON.stringify(userData));
+    await SecureStore.setItemAsync('token', newToken);
+    await SecureStore.setItemAsync('user', JSON.stringify(userData));
 
-      // Update state
-      setToken(newToken);
-      setUser(userData);
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } catch (error: any) {
-      const message = error.response?.data?.error || 'Login failed';
-      throw new Error(message);
-    }
+    setToken(newToken);
+    setUser(userData);
+    api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
   };
 
   const logout = async () => {
-    try {
-      await SecureStore.deleteItemAsync('token');
-      await SecureStore.deleteItemAsync('user');
-      setToken(null);
-      setUser(null);
-      delete api.defaults.headers.common['Authorization'];
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
+    await SecureStore.deleteItemAsync('token');
+    await SecureStore.deleteItemAsync('user');
+    setToken(null);
+    setUser(null);
+    delete api.defaults.headers.common['Authorization'];
   };
 
   return (
@@ -87,8 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 }

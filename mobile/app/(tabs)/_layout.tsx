@@ -1,17 +1,21 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
-import { Redirect } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 
-export default function TabsLayout() {
+export default function TabLayout() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
   }
 
   if (!user) {
-    return <Redirect href="/(auth)/login" />;
+    return <Redirect href="/login" />;
   }
 
   return (
@@ -26,64 +30,49 @@ export default function TabsLayout() {
           paddingTop: 8,
           paddingBottom: 28,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-        },
-        headerStyle: {
-          backgroundColor: '#fff',
-        },
-        headerTitleStyle: {
-          fontWeight: '600',
-          fontSize: 18,
-        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
+          headerShown: false,
+          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="transactions"
         options={{
           title: 'Transactions',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
-          ),
+          headerShown: false,
+          tabBarIcon: ({ color }) => <Ionicons name="list" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="add"
         options={{
           title: 'Add',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={32} color="#3B82F6" />
-          ),
+          headerShown: false,
+          tabBarIcon: ({ color }) => <Ionicons name="add-circle" size={32} color="#3B82F6" />,
         }}
       />
       <Tabs.Screen
         name="budgets"
         options={{
           title: 'Budgets',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="pie-chart" size={size} color={color} />
-          ),
+          headerShown: false,
+          tabBarIcon: ({ color }) => <Ionicons name="pie-chart" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
-          ),
+          headerShown: false,
+          tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} />,
         }}
       />
+      <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
   );
 }
