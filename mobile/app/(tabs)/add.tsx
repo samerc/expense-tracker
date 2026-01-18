@@ -12,25 +12,15 @@ import {
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { transactionsAPI, categoriesAPI, accountsAPI } from '../../src/services/api';
-
-interface Category {
-  id: string;
-  name: string;
-  type: string;
-  icon: string;
-}
-
-interface Account {
-  id: string;
-  name: string;
-  currency: string;
-  balance: number;
-}
+import { router } from 'expo-router';
+import { getAllAccounts, Account } from '../../src/database/repositories/accountsRepository';
+import { getAllCategories, Category } from '../../src/database/repositories/categoriesRepository';
+import { createTransaction } from '../../src/database/repositories/transactionsRepository';
 
 export default function AddTransactionScreen() {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [categoryId, setCategoryId] = useState<string>('');
   const [accountId, setAccountId] = useState<string>('');
@@ -39,6 +29,7 @@ export default function AddTransactionScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -46,12 +37,17 @@ export default function AddTransactionScreen() {
 
   const fetchData = async () => {
     try {
-      const [categoriesRes, accountsRes] = await Promise.all([
-        categoriesAPI.getAll(),
-        accountsAPI.getAll(),
+      const [categoriesData, accountsData] = await Promise.all([
+        getAllCategories(),
+        getAllAccounts(),
       ]);
-      setCategories(categoriesRes.data.categories || categoriesRes.data || []);
-      setAccounts(accountsRes.data.accounts || accountsRes.data || []);
+      setCategories(categoriesData);
+      setAccounts(accountsData);
+
+      // Auto-select first account if available
+      if (accountsData.length > 0 && !accountId) {
+        setAccountId(accountsData[0].id);
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -83,27 +79,37 @@ export default function AddTransactionScreen() {
 
     try {
       const selectedAccount = accounts.find((a) => a.id === accountId);
-      await transactionsAPI.create({
+
+      await createTransaction({
         title: title.trim(),
-        date: new Date().toISOString().split('T')[0],
+        date: date,
         lines: [
           {
-            accountId,
+            account_id: accountId,
             amount: parseFloat(amount),
             currency: selectedAccount?.currency || 'USD',
             direction: type,
-            categoryId,
-            exchangeRate: 1,
-            notes: notes.trim(),
+            category_id: categoryId,
+            exchange_rate: 1,
+            notes: notes.trim() || undefined,
           },
         ],
       });
 
-      Alert.alert('Success', 'Transaction added successfully!', [
-        { text: 'OK', onPress: resetForm },
-      ]);
+      // Show success toast
+      setShowSuccess(true);
+
+      // Reset form
+      resetForm();
+
+      // Navigate to transactions tab after a brief delay
+      setTimeout(() => {
+        setShowSuccess(false);
+        router.replace('/(tabs)/transactions');
+      }, 1500);
+
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to add transaction');
+      Alert.alert('Error', error.message || 'Failed to add transaction');
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +118,7 @@ export default function AddTransactionScreen() {
   const resetForm = () => {
     setTitle('');
     setAmount('');
+    setDate(new Date().toISOString().split('T')[0]);
     setCategoryId('');
     setNotes('');
   };
@@ -187,6 +194,18 @@ export default function AddTransactionScreen() {
               placeholderTextColor="#9CA3AF"
               value={title}
               onChangeText={setTitle}
+            />
+          </View>
+
+          {/* Date Input */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Date</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#9CA3AF"
+              value={date}
+              onChangeText={setDate}
             />
           </View>
 
@@ -273,11 +292,19 @@ export default function AddTransactionScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Success Toast */}
+      {showSuccess && (
+        <View style={styles.toast}>
+          <Ionicons name="checkmark-circle" size={24} color="#fff" />
+          <Text style={styles.toastText}>Transaction added!</Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-const getCategoryIcon = (icon: string): any => {
+const getCategoryIcon = (icon?: string): any => {
   const iconMap: Record<string, string> = {
     'shopping-cart': 'cart',
     'home': 'home',
@@ -293,7 +320,7 @@ const getCategoryIcon = (icon: string): any => {
     'piggy-bank': 'cash',
     'chart-line': 'trending-up',
   };
-  return iconMap[icon] || 'ellipse';
+  return iconMap[icon || ''] || 'ellipse';
 };
 
 const styles = StyleSheet.create({
@@ -467,6 +494,30 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

@@ -29,6 +29,7 @@ This guide covers deploying the Expense Tracker application to a Windows Server 
 9. [Verification](#9-verification)
 10. [Maintenance Commands](#10-maintenance-commands)
 11. [Troubleshooting](#11-troubleshooting)
+12. [Mobile App Configuration](#12-mobile-app-configuration)
 
 ---
 
@@ -702,6 +703,79 @@ For issues with this deployment:
 1. Check PM2 logs: `pm2 logs expense-tracker`
 2. Check IIS logs: `C:\inetpub\logs\LogFiles\`
 3. Check Windows Event Viewer for system errors
+
+---
+
+## 12. Mobile App Configuration
+
+The mobile app (Expo/React Native) can connect to either your local development server or the production server.
+
+### 12.1 API URL Configuration
+
+The API URL is configured in `mobile/src/services/api.ts`:
+
+```typescript
+// Toggle this for local development vs production
+const USE_LOCAL = true; // Set to true when testing with local backend
+```
+
+**Settings:**
+- `USE_LOCAL = true` → Connects to your local backend (auto-detects IP)
+- `USE_LOCAL = false` → Connects to production (`https://expense.fancyshark.com/api`)
+
+### 12.2 Local Development Setup
+
+When testing with your local backend:
+
+1. **Set `USE_LOCAL = true`** in `mobile/src/services/api.ts`
+
+2. **Start your local backend:**
+   ```powershell
+   cd server
+   npm run dev
+   ```
+
+3. **Start the Expo dev server:**
+   ```powershell
+   cd mobile
+   npx expo start
+   ```
+
+4. **Ensure both devices are on the same WiFi network**
+
+The mobile app automatically detects your computer's IP address from Expo's debugger host - no need to manually update the IP when it changes.
+
+### 12.3 Production Deployment
+
+When deploying or testing against production:
+
+1. **Set `USE_LOCAL = false`** in `mobile/src/services/api.ts`
+
+2. The app will connect to the production API at `https://expense.fancyshark.com/api`
+
+### 12.4 How Auto-Detection Works
+
+```typescript
+const getLocalApiUrl = () => {
+  // Expo provides the dev machine's IP via debuggerHost
+  const debuggerHost = Constants.expoGoConfig?.debuggerHost;
+  if (debuggerHost) {
+    const ip = debuggerHost.split(':')[0];
+    return `http://${ip}:3000/api`;
+  }
+  // Fallback for Android emulator
+  return 'http://10.0.2.2:3000/api';
+};
+```
+
+### 12.5 Troubleshooting Mobile Connection
+
+| Issue | Solution |
+|-------|----------|
+| Can't connect to local server | Ensure phone and computer are on same WiFi |
+| "Network request failed" | Check if backend is running on port 3000 |
+| Wrong credentials/data | Verify `USE_LOCAL` setting matches intended server |
+| IP not detected | Restart Expo server, check `Constants.expoGoConfig` |
 
 ---
 

@@ -1,13 +1,75 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Switch, Modal, TextInput } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
+import { userAPI } from '../../src/services/api';
+import { router } from 'expo-router';
 import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  // Profile editing state
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileName, setProfileName] = useState(user?.name || '');
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  // Password change state
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const handleSaveProfile = async () => {
+    if (!profileName.trim()) {
+      Alert.alert('Error', 'Name is required');
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      await userAPI.updateProfile({ name: profileName.trim() });
+      Alert.alert('Success', 'Profile updated successfully');
+      setProfileModalVisible(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to update profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'All fields are required');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      await userAPI.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      Alert.alert('Success', 'Password changed successfully');
+      setPasswordModalVisible(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to change password');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -80,17 +142,39 @@ export default function SettingsScreen() {
             icon="person-outline"
             title="Edit Profile"
             subtitle="Name, email"
-            onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available in a future update.')}
+            onPress={() => {
+              setProfileName(user?.name || '');
+              setProfileModalVisible(true);
+            }}
           />
           <SettingItem
             icon="lock-closed-outline"
             title="Change Password"
-            onPress={() => Alert.alert('Coming Soon', 'Password change will be available in a future update.')}
+            onPress={() => setPasswordModalVisible(true)}
           />
           <SettingItem
             icon="home-outline"
             title="Household"
             subtitle={user?.householdName || 'Your household'}
+          />
+        </View>
+      </View>
+
+      {/* Data Management Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Manage</Text>
+        <View style={styles.sectionContent}>
+          <SettingItem
+            icon="wallet-outline"
+            title="Accounts"
+            subtitle="Manage your bank accounts"
+            onPress={() => router.push('/accounts')}
+          />
+          <SettingItem
+            icon="folder-outline"
+            title="Categories"
+            subtitle="Expense and income categories"
+            onPress={() => router.push('/categories')}
           />
         </View>
       </View>
@@ -195,6 +279,111 @@ export default function SettingsScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>Expense Tracker by FancyShark</Text>
       </View>
+
+      {/* Profile Edit Modal */}
+      <Modal visible={profileModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={profileName}
+                onChangeText={setProfileName}
+                placeholder="Your name"
+              />
+            </View>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>Email</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalInputDisabled]}
+                value={user?.email || ''}
+                editable={false}
+              />
+              <Text style={styles.modalHint}>Email cannot be changed</Text>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonSecondary}
+                onPress={() => setProfileModalVisible(false)}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButtonPrimary, profileSaving && styles.modalButtonDisabled]}
+                onPress={handleSaveProfile}
+                disabled={profileSaving}
+              >
+                <Text style={styles.modalButtonPrimaryText}>
+                  {profileSaving ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Password Change Modal */}
+      <Modal visible={passwordModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>Current Password</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                placeholder="Enter current password"
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>New Password</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="Enter new password"
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.modalInputGroup}>
+              <Text style={styles.modalLabel}>Confirm New Password</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm new password"
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonSecondary}
+                onPress={() => {
+                  setPasswordModalVisible(false);
+                  setCurrentPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButtonPrimary, passwordSaving && styles.modalButtonDisabled]}
+                onPress={handleChangePassword}
+                disabled={passwordSaving}
+              >
+                <Text style={styles.modalButtonPrimaryText}>
+                  {passwordSaving ? 'Changing...' : 'Change'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -313,5 +502,82 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 13,
     color: '#9CA3AF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modalInputGroup: {
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalInputDisabled: {
+    backgroundColor: '#E5E7EB',
+    color: '#6B7280',
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  modalButtonSecondaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+  },
+  modalButtonPrimaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
   },
 });

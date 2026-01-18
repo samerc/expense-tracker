@@ -112,44 +112,99 @@ Super admin pages are in `web-admin/src/pages/super-admin/`.
 
 ## Mobile App (mobile/)
 
-React Native app built with Expo SDK 54 for iOS/Android.
+React Native app built with Expo SDK 54 for iOS/Android. **Offline-first architecture** using SQLite.
 
 ### Running the Mobile App
 ```bash
 cd mobile
 npm install
-npx expo start --tunnel    # Use tunnel for testing on physical device
+npx expo start           # LAN mode (recommended for local dev)
+npx expo start --tunnel  # Tunnel mode (for remote testing)
 ```
 Scan QR code with Expo Go app on your phone.
 
+### Mobile Architecture: Offline-First
+
+The mobile app is designed to work **fully offline** as a standalone product:
+
+| Feature | Free Plan | Premium Plan |
+|---------|-----------|--------------|
+| Mobile app | Yes | Yes |
+| Offline storage (SQLite) | Yes | Yes |
+| Cloud sync | No | Yes |
+| Multi-device | No | Yes |
+| Web app access | No | Yes |
+
+**Key Principle:** SQLite is the primary data store, not a cache. The app works 100% without internet.
+
 ### Mobile Structure
-- `app/` - Expo Router file-based navigation
-  - `_layout.tsx` - Root layout with AuthProvider
-  - `login.tsx` - Login screen
-  - `(tabs)/` - Tab navigator (authenticated screens)
-    - `index.tsx` - Home/Dashboard
-    - `transactions.tsx` - Transaction list
-    - `add.tsx` - Add transaction form
-    - `budgets.tsx` - Budget/Allocations view
-    - `settings.tsx` - User settings & logout
-- `src/context/AuthContext.tsx` - Auth state with expo-secure-store
-- `src/services/api.ts` - Axios client pointing to production API
+```
+mobile/
+├── app/                          # Expo Router file-based navigation
+│   ├── _layout.tsx               # Root layout with DatabaseProvider + AuthProvider
+│   ├── login.tsx                 # Login screen (for premium sync)
+│   └── (tabs)/                   # Tab navigator
+│       ├── index.tsx             # Home/Dashboard
+│       ├── transactions.tsx      # Transaction list with edit/delete
+│       ├── add.tsx               # Add transaction form
+│       ├── budgets.tsx           # Budget/Allocations view
+│       └── settings.tsx          # User settings
+├── src/
+│   ├── database/                 # SQLite database layer
+│   │   ├── index.ts              # Database init, migrations, seeding
+│   │   ├── schema.ts             # Table definitions + default data
+│   │   └── repositories/         # CRUD operations per entity
+│   │       ├── accountsRepository.ts
+│   │       ├── categoriesRepository.ts
+│   │       ├── transactionsRepository.ts
+│   │       ├── allocationsRepository.ts
+│   │       └── userRepository.ts
+│   ├── context/
+│   │   ├── DatabaseContext.tsx   # App-wide database state + network monitoring
+│   │   └── AuthContext.tsx       # Auth state (for premium users)
+│   ├── utils/
+│   │   ├── uuid.ts               # UUID generation for local records
+│   │   └── network.ts            # Network state detection
+│   └── services/
+│       └── api.ts                # Axios client (for sync, premium only)
+```
+
+### Database Schema (SQLite)
+
+All tables include sync tracking columns:
+- `id` - Local UUID (primary key)
+- `server_id` - Server UUID (after sync)
+- `sync_status` - `pending` | `synced` | `conflict` | `deleted`
+- `created_at`, `modified_at` - Local timestamps
+- `server_modified_at` - Server timestamp (for conflict detection)
+
+Tables: `accounts`, `categories`, `transactions`, `transaction_lines`, `allocations`, `user_profile`, `app_settings`, `sync_log`, `sync_conflicts`
+
+### Sync Flow (Premium Users)
+
+1. **Local changes** → marked as `sync_status = 'pending'`
+2. **When online + premium** → push pending changes to server
+3. **Server responds** → update `server_id` and `sync_status = 'synced'`
+4. **Conflicts detected** → stored in `sync_conflicts` table for user resolution
+5. **User resolves** → picks local or server version
 
 ### Mobile Current State (Jan 2026)
-- ✅ Basic screens created and functional
-- ✅ Login flow works with SecureStore token persistence
-- ✅ Connects to production API (https://expense.fancyshark.com/api)
-- ⏳ WatermelonDB offline storage not yet implemented
-- ⏳ Multi-device sync not yet implemented
-- ⏳ Touch-optimized category selection (drag) not yet implemented
+- ✅ SQLite database with full schema
+- ✅ Repository layer for all entities (CRUD)
+- ✅ DatabaseProvider context with network monitoring
+- ✅ Home, Transactions, Add Transaction screens use local SQLite
+- ✅ Default categories and account seeded on first run
+- ✅ Sync status tracking on all records
+- ⏳ Budgets, Accounts, Categories screens need refactor to SQLite
+- ⏳ Sync engine for premium users not yet built
+- ⏳ Conflict resolution UI not yet built
 
 ### Mobile Next Steps
-1. Set up WatermelonDB for offline-first storage
-2. Build sync mechanism between local DB and server
-3. Implement touch-friendly category picker (drag to select)
-4. Add transaction edit/delete functionality
-5. Implement budget funding from mobile
-6. App store preparation (icons, splash, builds)
+1. Refactor remaining screens (Budgets, Accounts, Categories) to use SQLite
+2. Build sync engine for premium users
+3. Create conflict resolution UI
+4. Discuss and implement final tab/navigation design
+5. App store preparation (icons, splash, builds)
 
 ---
 
@@ -186,6 +241,15 @@ VALUES (
 ## Session Notes (Last Updated: Jan 2026)
 
 ### Recently Completed
+- **Mobile offline-first architecture** - SQLite database with full schema
+- Installed `expo-sqlite` and `expo-network` packages
+- Created repository layer for all entities (accounts, categories, transactions, allocations)
+- Added DatabaseProvider context with network state monitoring
+- Refactored Home, Transactions, Add Transaction screens to use local SQLite
+- Default data seeding (categories, account) on first app launch
+- Sync status tracking (`pending`, `synced`, `conflict`, `deleted`) on all records
+
+### Previously Completed
 - Deployed web app to Windows Server 2025 with IIS
 - Connected project to GitHub (github.com/samerc/expense-tracker)
 - Created mobile app with Expo SDK 54
@@ -199,11 +263,48 @@ VALUES (
   - Multi-currency support per line
   - See: `web-admin/src/components/transactions/TransactionModal.jsx`
 
+- **Super Admin Management** - Full CRUD operations
+  - Create/Edit/Delete households (with plan assignment)
+  - Create/Edit/Delete users (with password setting)
+  - Reset user passwords (displays new password since email not working)
+  - Subscription plans management
+  - See: `web-admin/src/pages/super-admin/`
+
+- **Forgot Password** - Works without email
+  - User enters email on `/forgot-password`
+  - New temporary password is displayed on screen
+  - User must copy and use it to login
+
 ### Pending Features
-1. **Mobile offline sync** - WatermelonDB setup pending
-2. **Email invitations** - Backend exists, email sending not implemented
-3. **Mobile transaction features** - Edit/delete, budget funding from mobile
+1. **Mobile sync engine** - SQLite setup complete, sync to server pending
+2. **Mobile conflict resolution** - UI for resolving multi-device conflicts
+3. **Email invitations** - Backend exists, email sending not implemented
+4. **Remaining mobile screens** - Budgets, Accounts, Categories need SQLite refactor
+
+### Database Migrations to Run
+If setting up a new server or getting errors, ensure these migrations are applied:
+```sql
+-- Migration 011: Add missing columns to subscription_plans
+ALTER TABLE subscription_plans
+ADD COLUMN IF NOT EXISTS price_annual DECIMAL(10, 2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS max_users INTEGER DEFAULT -1,
+ADD COLUMN IF NOT EXISTS max_accounts INTEGER DEFAULT -1,
+ADD COLUMN IF NOT EXISTS max_budgets INTEGER DEFAULT -1,
+ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '{}';
+```
 
 ### Known Production Issues
 - Allocations API returns 500 if user has no allocations set up for the month
 - Super admin needs to create household + user before someone can log in
+
+### Key API Endpoints (Super Admin)
+```
+POST   /api/super-admin/households              - Create household
+PUT    /api/super-admin/households/:id          - Update household (incl. plan)
+POST   /api/super-admin/users                   - Create user
+PUT    /api/super-admin/users/:id               - Update user
+DELETE /api/super-admin/users/:id               - Delete user
+POST   /api/super-admin/users/:id/reset-password - Reset password (returns new pw)
+POST   /api/super-admin/plans                   - Create subscription plan
+PUT    /api/super-admin/plans/:id               - Update plan
+```
